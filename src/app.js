@@ -195,18 +195,18 @@ app.post("/auth/login", async (req, res) => {
 
 //ajouter une habitude ne marche uniquement si l'utilisateur est connecté par le biais de authenticatetoken
 app.post("/habits", authenticateToken, (req, res) => {
-	const {title, description} = req.body
+	const {title, description, is_global} = req.body
 
 	if (!title) return res.status(400).json({ message: 'le titre est requis' })
 
 	db.run(
-		"INSERT INTO habits (user_id, title, description) VALUES (?, ?, ?)",
-		[req.user.id, title, description],
+		"INSERT INTO habits (user_id, title, description, is_global) VALUES (?, ?, ?, ?)",
+		[req.user.id, title, description, is_global],
 		function (err) {
 			if (err)
 				return res.status(500).json({ message: "Erreur lors de la création de l'habitude" })
 			// Redirection vers le tableau de bord après ajout d'une habitude
-			res.status(200).json({ title, description })
+			res.status(200).json({ title, description, is_global })
 		}
 	)
 })
