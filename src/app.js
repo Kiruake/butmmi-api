@@ -62,8 +62,7 @@ app.get("/dashboard", authenticateToken, (req, res) => {
 			db.all(
 				`SELECT h.*
                  FROM habits h
-                 WHERE h.user_id = ?
-                   AND h.is_global = 0`,
+                 WHERE h.user_id = ?`,
 				[req.user.id],
 				(err, personalHabits) => {
 					if (err)
@@ -232,14 +231,14 @@ app.get("/habits", authenticateToken, (req, res) => {
 
 // Ici j'utilise post au lieu de put pour la compatibilité avec le formulaire html qui ne gère que post et get pour gérer la mise a jour d'habitude
 app.put("/habits/:id", authenticateToken, (req, res) => {
-	const {title, description} = req.body
+	const {title, description, is_global} = req.body
 	const habitId = req.params.id
 
 	if (!title) return res.status(400).send("Le titre est requis")
 
 	db.run(
-		"UPDATE habits SET title = ?, description = ? WHERE id = ? AND user_id = ?",
-		[title, description, habitId, req.user.id],
+		"UPDATE habits SET title = ?, description = ?, is_global = ? WHERE id = ? AND user_id = ?",
+		[title, description, is_global, habitId, req.user.id],
 		function (err) {
 			if (err) return res.status(500).json({ message: "Erreur lors de la modification"})
 			if (this.changes === 0)
