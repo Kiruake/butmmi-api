@@ -1,4 +1,3 @@
-// import du goat sqlite3 <3
 const sqlite3 = require("sqlite3").verbose();
 
 const db = new sqlite3.Database("./jadoresqlite3.db", (err) => {
@@ -6,95 +5,75 @@ const db = new sqlite3.Database("./jadoresqlite3.db", (err) => {
     console.error("erreur de connexion à la database:", err);
   } else {
     console.log("connecté à la databse");
-    initDatabase();
+    initializeTables(); // Initialisation des tables dans la Database();
   }
 });
 
-// j'ai mis "CREATE TABLE IF NOT EXISTS nomtable" au début de chaque table comme ca je n'ai pas besoin de supprimer mon fichier de config de table à terme, rien ne sera écrasé si je relance mon fichier de config
-function initDatabase() {
+
+function initializeTables() {
   db.serialize(() => {
-    // table avec les infos des utilisateurs
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+      db.run(`
+          CREATE TABLE IF NOT EXISTS User (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              username TEXT NOT NULL UNIQUE,
+              password TEXT NOT NULL
+          )
+      `);
 
-    // Table contenant les informations relative aux habits ou habitudes avec clé étrangère vers la table user
-    // Ajout de la colonne is_global pour différencier les habitudes globales des personnelles
-    db.run(`CREATE TABLE IF NOT EXISTS habits (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER,
-      title TEXT NOT NULL,
-      description TEXT,
-      is_global BOOLEAN DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users (id)
-    )`);
+      db.run(`
+          CREATE TABLE IF NOT EXISTS Habit (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              is_global INTEGER DEFAULT 1,
+              user_id INTEGER,
+              FOREIGN KEY (user_id) REFERENCES User (id)
+          )
+      `);
 
-    // Table me permettant la gestion du suivi des habitudes avec clé étrangère vers la table habit et user
-    db.run(`CREATE TABLE IF NOT EXISTS habit_tracking (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      habit_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      completed BOOLEAN NOT NULL DEFAULT 0,
-      date DATE NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (habit_id) REFERENCES habits (id),
-      FOREIGN KEY (user_id) REFERENCES users (id)
-    )`);
+      db.run(`
+          CREATE TABLE IF NOT EXISTS UserHabitTemplate (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER NOT NULL,
+              day_of_week INTEGER NOT NULL CHECK(day_of_week BETWEEN 0 AND 6),
+              FOREIGN KEY (user_id) REFERENCES User (id)
+          )
+      `);
 
-    // Insertion des habitudes globales si elles n'existent pas déjà
-    db.get(
-      "SELECT COUNT(*) as count FROM habits WHERE is_global = 1",
-      [],
-      (err, row) => {
-        if (err) {
-          console.error(
-            "Erreur lors de la vérification des habitudes globales:",
-            err
-          );
-          return;
-        }
+      db.run(`
+          CREATE TABLE IF NOT EXISTS UserHabitTemplateDetails (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              template_id INTEGER NOT NULL,
+              habit_id INTEGER NOT NULL,
+              FOREIGN KEY (template_id) REFERENCES UserHabitTemplate (id),
+              FOREIGN KEY (habit_id) REFERENCES Habit (id)
+          )
+      `);
 
-        // Si aucune habitude globale n'existe, on les crée
-        if (row.count === 0) {
-          const globalHabits = [
-            {
-              title: "Méditation quotidienne",
-              description: "Prendre 10 minutes pour méditer et se recentrer",
-            },
-            {
-              title: "Boire de l'eau",
-              description: "Boire au moins 2L d'eau par jour",
-            },
-            {
-              title: "Activité physique",
-              description: "30 minutes d'exercice physique",
-            },
-          ];
+      db.run(`
+          CREATE TABLE IF NOT EXISTS UserHabitTracking (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER NOT NULL,
+              date DATE NOT NULL,
+              FOREIGN KEY (user_id) REFERENCES User (id),
+              UNIQUE(user_id, date)
+          )
+      `);
+      
+      db.run(`
+          CREATE TABLE IF NOT EXISTS UserHabitTrackingDetails (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              tracking_id INTEGER NOT NULL,
+              habit_id INTEGER NOT NULL,
+              is_completed INTEGER DEFAULT 0,
+              FOREIGN KEY (tracking_id) REFERENCES UserHabitTracking (id),
+              FOREIGN KEY (habit_id) REFERENCES Habit (id),
+              UNIQUE(tracking_id, habit_id)
+          )
+      `);
 
-          // Insertion des habitudes globales
-          const stmt = db.prepare(
-            "INSERT INTO habits (title, description, is_global) VALUES (?, ?, 1)"
-          );
-          globalHabits.forEach((habit) => {
-            stmt.run([habit.title, habit.description], (err) => {
-              if (err) {
-                console.error(
-                  "Erreur lors de l'insertion d'une habitude globale:",
-                  err
-                );
-              }
-            });
-          });
-          stmt.finalize();
-        }
-      }
-    );
+  console.log('Tables créées avec succès.');
   });
 }
 
-// j'exporte db pour pouvoir l'importer dans mon app.js
+
 module.exports = db;
